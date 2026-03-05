@@ -84,7 +84,7 @@ class FeatureEngineer:
 
         self.add_target_label(look_forward=5, threshold=-0.05)
 
-        self.df.dropna(inplace=True)
+        self.df.dropna(subset=['SMA_50', 'MACD', 'RSI_14'], inplace=True)
         return self.df
     
         
