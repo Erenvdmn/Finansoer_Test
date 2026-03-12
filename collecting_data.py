@@ -20,8 +20,8 @@ class DataDownloader:
         if os.path.exists(file_path):
             print(f"✅ Loading {ticker} data from local disk...")
             
-            df = pd.read_csv(file_path, index_col="Date", parse_dates=True) 
-
+            df = pd.read_csv(file_path, header=[0, 1], index_col=0, parse_dates=True)
+            
             # Make sure the index is timezone-naive so comparisons work
             if df.index.tz is not None:
                 df.index = df.index.tz_localize(None)
@@ -86,7 +86,7 @@ class DataDownloader:
             print(f"❌ Error occurred while downloading full data: {e}")
             return None
 
-# TESTING  
+# for manuel testing of this file
 if __name__ == "__main__":
     downloader = DataDownloader()
     df = downloader.get_daily_data("AAPL")

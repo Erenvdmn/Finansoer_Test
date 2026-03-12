@@ -48,7 +48,7 @@ class RiskScorer:
             X_latest = latest_data[self.features].iloc[[-1]]
 
             risk_prob = calibrated_model.predict_proba(X_latest)[0][1]
-            print(f"{latest_date} AAPL Analyze:")
+            print(f"{latest_date} Risk Analyze:")
             print(f"Posibility of Sharp Decline Risk Score: %{risk_prob * 100:.2f}")
 
             print("SHAP Description (Factors that effects Risk Score) preparing...")
@@ -67,6 +67,11 @@ class RiskScorer:
             plt.savefig("shap_explanaiton.png", bbox_inches='tight')
             print("SHAP image saved as 'shap_explanaiton.png'")
 
+            return risk_prob * 100
+        # If there is no current data
+        return None
+
+# for manuel testing of this file
 if __name__=="__main__":
     scorer = RiskScorer("data/AAPL_daily.csv")
     scorer.train_and_explain()

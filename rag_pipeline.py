@@ -1,70 +1,79 @@
 import os
+import yfinance as yf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_community.llms import Ollama
 from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_ollama import OllamaLLM
 
 
-class DocumentIntelligence:
+class DocumentIntelligence: 
     def __init__(self):
-        self.llm = Ollama(model="llama3")
-
-        # Model that will turn texts to vectors
+        self.llm = OllamaLLM(model="llama3")
         self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-    def create_mock_sec_report(self):
-        print("Apple SEC (10-K) Risk Raporu preparing...")
-        report_text = """
-        Item 1A. Risk Factors (Apple Inc.)
-        We face significant supply chain constraints in our primary manufacturing hubs due to recent geopolitical tensions. 
-        Additionally, the European Union's new regulatory frameworks (Digital Markets Act) force us to allow third-party app stores, 
-        which is expected to severely reduce our Service sector revenue margins in the upcoming quarters. 
-        Furthermore, global consumer demand for premium smartphones is showing signs of cooling off amidst rising inflation. 
-        While our balance sheet remains strong, these macroeconomic headwinds pose a material risk to short-term stock performance.
-        """
+    def fetch_real_financial_data(self, ticker):
+        print(f"{ticker}'s financial datas pulling with Yahoo Finance...")
+        stock = yf.Ticker(ticker)
 
-        return [Document(page_content=report_text)]
+        # Business Summary
+        company_info = stock.info.get('longBusinessSummary', 'Infos could not found')
+
+        # Last 5 news about companies 
+        news_items = stock.news
+        news_text = "Recent Market News:\n"
+
+        for item in news_items[:5]:
+            title = item.get('title', 'Title could not get')
+            publisher = item.get('publisher', 'Unknown resource')
+            news_text += f"- {title} (Source: {publisher})\n"
+
+        full_text = f"Company Context:\n{company_info}\n\n{news_text}"
+
+        print(f"Data pulled sucsessfully, Llama 3 train with news right now")
+        return [Document(page_content=full_text)]
     
-    def build_vector_database(self):
-        docs = self.create_mock_sec_report()
 
-        # Chunking
-        print("Texts is Chunking...")
+    def build_vector_database(self, ticker):
+        docs = self.fetch_real_financial_data(ticker)
+
+        print("Datas chunking...")
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         chunks = text_splitter.split_documents(docs)
 
-        print("Creating FAISS...")
+        print("Vector Database (FAISS) creating...")
         vectorstore = FAISS.from_documents(chunks, self.embeddings)
         return vectorstore
     
-    def analyze_risk(self, numerical_risk_score):
-        vectorstore = self.build_vector_database()
+    def analyze_risk(self, ticker, numerical_risk_score):
+        vectorstore = self.build_vector_database(ticker)
+        retriever = vectorstore.as_retriever()
 
-        retriever=vectorstore.as_retriever()
-
-        relevant_docs = retriever.invoke("What are the macroeconomic and supply chain risks?")
+        relevant_docs = retriever.invoke("What are the recent news, challenges or risks?")
         context_text = "\n\n".join([doc.page_content for doc in relevant_docs])
 
         prompt = f"""
         You are a senior Wall Street quantitative analyst. 
-        Our XGBoost machine learning model calculated a sharp decline risk score of {numerical_risk_score}% for Apple (AAPL) based on technical indicators like SMA_50 and Volatility.
+        Our XGBoost machine learning model calculated a risk score of {numerical_risk_score}% for {ticker} based on technical indicators.
         
-        Here is the SEC risk report context:
+        Here is the real-time market data and recent news context for {ticker}:
         {context_text}
         
-        Based ONLY on the provided SEC risk report context above, answer this:
-        Does the text reveal any hidden risks that the numerical model missed? Should investors be worried despite the low {numerical_risk_score}% numerical risk?
+        Based ONLY on the provided context above, answer this:
+        Does the real-time data reveal any hidden risks, challenges, or positive news that the numerical model missed? 
+        Should investors adjust their expectations despite the {numerical_risk_score}% numerical risk?
         Explain briefly in 3-4 sentences.
         """
 
-        print("Llama 3 is thinking and writing report...")
-        print("-"*50)
+        print(f"\n🚀 Llama 3, thinking for {ticker} financial data...\n")
+        print("-" * 50)
 
         response = self.llm.invoke(prompt)
         print(response)
-        print("\n"+"-"*50)
+        print("\n" + "-" * 50)
 
+# for manuel testing of this file
 if __name__=="__main__":
     rag = DocumentIntelligence()
-    rag.analyze_risk(numerical_risk_score=14.80)
+
+    rag.analyze_risk(ticker="AAPL", numerical_risk_score=14.80)
