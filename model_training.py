@@ -7,56 +7,8 @@ import torch
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from feature_engineering import FeatureEngineer
-
 import torch.nn as nn
 import torch.optim as optim
-
-
-class DataPreparation:
-    def __init__(self, filepath, seq_length=30):
-        self.filepath = filepath
-        self.seq_length = seq_length
-        self.scaler = MinMaxScaler(feature_range=(0,1))
-
-
-    def get_data(self):
-        print("Datas pulling from FeatureEngineer...")
-        engineer = FeatureEngineer(self.filepath)
-        df = engineer.get_processed_data()
-
-        features = ['Close', 'Daily_Return', 'Volatility', 'RSI_14', 'MACD', 'SMA_20', 'SMA_50']
-        target = 'Target_Downside'
-
-        scaled_features = self.scaler.fit_transform(df[features])
-        targets = df[target].values
-
-        print(f"creating {self.seq_length} days time windows...")
-        # Last 30 days = X, point = y
-        X, y = [], []
-        for i in range((self.seq_length), len(scaled_features)):
-            X.append(scaled_features[i - self.seq_length : i])
-            y.append(targets[i])
-
-        X, y = np.array(X), np.array(y)
-
-
-        # %80 Learning, %20 Test
-        split_idx = int(len(X)*0.8)
-        X_train, X_test = X[:split_idx], X[split_idx:]
-        y_train, y_test = y[:split_idx], y[split_idx:]
-
-
-        print("Datas are being transform to PyTroch Tensors...")
-        X_train = torch.tensor(X_train, dtype=torch.float32)
-        y_train = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
-        X_test = torch.tensor(X_test, dtype=torch.float32)
-        y_test = torch.tensor(y_test, dtype=torch.float32).unsqueeze(1)
-
-        return X_train, X_test, y_train, y_test
-    
-
-
 
 class DownsideLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -79,42 +31,74 @@ class DownsideLSTM(nn.Module):
         out = self.fc(out[:, -1, :])
         return self.sigmoid(out)
 
+class LSTM_Pipeline:
+    def __init__(self, filepath, seq_length=30):
+        self.filepath = filepath
+        self.seq_length = seq_length
+        self.features = ['Close', 'Daily_Return', 'Volatility', 'RSI_14','MACD','SMA_20','SMA_50']
+        self.scaler = MinMaxScaler(feature_range=(0,1))
 
-def train_model(X_train, y_train):
-    input_size = 7
-    hidden_size = 128
-    num_layers = 2
-    output_size = 1
-    num_epochs = 100
-    learning_rate = 0.0005
+        filename = os.path.basename(self.filepath).split('_')[0]
+        self.model_path = f'models/{filename}_lstm.pth'
 
-    model = DownsideLSTM(input_size, hidden_size, num_layers, output_size)
-    critertion = nn.BCELoss() # Binary Cross Entropy
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        if not os.path.exists("models"):
+            os.makedirs("models")
 
-    print("Epoch starting...")
+    def process_sequences(self, df):
+        scaled_features = self.scaler.fit_transform(df[self.features])
+        X = []
+        for i in range(self.seq_length, len(scaled_features)):
+            X.append(scaled_features[i - self.seq_length : i])
+        return np.array(X)
+    
+    def train_model(self, df):
+        print(f"Training Deep Learning (LSTM) for {self.filepath}...")
 
-    for epoch in range(num_epochs):
+        X_data = self.process_sequences(df)
+        y_data = df['Target_Downside'].values[self.seq_length:]
+
+        valid_idx = ~np.isnan(y_data)
+        X_train = torch.tensor(X_data[valid_idx], dtype=torch.float32)
+        y_train = torch.tensor(y_data[valid_idx], dtype=torch.float32).unsqueeze(1)
+
+        model = DownsideLSTM(input_size=len(self.features), hidden_size=128, num_layers=2, output_size=1)
+        criterion = nn.BCELoss()
+        optimizer = optim.Adam(model.parameters(), lr=0.0005)
+
         model.train()
-        optimizer.zero_grad()
+        num_epochs=100
+        for epoch in range(num_epochs):
+            optimizer.zero_grad()
+            outputs = model(X_train)
+            loss = criterion(outputs, y_train)
+            loss.backward()
+            optimizer.step()
 
-        outputs = model(X_train)
-        loss = critertion(outputs, y_train)
+            if (epoch + 1) % 20 == 0:
+                print(f"LSTM Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
 
-        loss.backward()
-        optimizer.step()
+        torch.save(model.state_dict(), self.model_path)
+        print(f"LSTM Model saved to {self.model_path}")
 
-        if (epoch+1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
+    def add_lstm_predictions(self, df):
+        # Is there a trained model for this ticker, if not then train_model(df)
+        if not os.path.exists(self.model_path):
+            self.train_model(df)
+        else:
+            print(f"Existing LSTM Model found at {self.model_path}, loading weigths...")
 
-    return model
+        model = DownsideLSTM(input_size=len(self.features), hidden_size=128, num_layers=2, output_size=1)
+        model.load_state_dict(torch.load(self.model_path))
+        model.eval()
 
+        X_data = self.process_sequences(df)
+        X_tensor = torch.tensor(X_data, dtype=torch.float32)
 
-if __name__ == "__main__":
-    dp = DataPreparation("data/AAPL_daily.csv", seq_length=30)
-    X_train, X_test, y_train, y_test = dp.get_data()
+        with torch.no_grad():
+            predictions = model(X_tensor).numpy().flatten()
 
-    trained_model = train_model(X_train, y_train)
+        # can't guess because first 30 days is NaN
+        padded_preds = np.concatenate([np.full(self.seq_length, np.nan), predictions])
 
-    torch.save(trained_model.state_dict(), "models/downside_lstm.pth")
-    print("\n Model sucsessfully trained and saved as models/downside_lstm.pth")
+        df['LSTM_Risk'] = padded_preds
+        return df

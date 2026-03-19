@@ -4,12 +4,13 @@ import shap
 import matplotlib.pyplot as plt
 from sklearn.calibration import CalibratedClassifierCV
 from feature_engineering import FeatureEngineer
+from model_training import LSTM_Pipeline
 
 
 class RiskScorer:
     def __init__(self, filepath):
         self.filepath = filepath
-        self.features = ['Daily_Return', 'Volatility', 'RSI_14', 'MACD', 'SMA_20', 'SMA_50']
+        self.features = ['Daily_Return', 'Volatility', 'RSI_14', 'MACD', 'SMA_20', 'SMA_50', 'LSTM_Risk']
         self.target = 'Target_Downside'
 
     
@@ -18,7 +19,11 @@ class RiskScorer:
         engineer = FeatureEngineer(self.filepath)
         df = engineer.get_processed_data()
 
-        train_df = df.dropna(subset=[self.target])
+        print("Deep Learining (LSTM) memory connecting to pipeline...")
+        lstm_pipeline = LSTM_Pipeline(self.filepath, seq_length=30)
+        df = lstm_pipeline.add_lstm_predictions(df)
+
+        train_df = df.dropna(subset=[self.target, 'LSTM_Risk'])
         latest_data = df[df[self.target].isna()].copy()
 
         X = train_df[self.features]
