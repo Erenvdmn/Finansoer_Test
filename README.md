@@ -39,7 +39,17 @@ The entire system is orchestrated through a single script (`main.py`) and operat
 
 The system will print out the step-by-step process, the final numerical risk score, the SHAP breakdown, and the Llama 3 analyst report.
 
-## 🗺️ Future Roadmap
-- **Streamlit Web Dashboard:** Migrating the terminal output to an interactive web interface with live charts and UI buttons.
-- **Deep Learning Integration:** Adding an LSTM (Long Short-Term Memory) neural network alongside XGBoost for more complex time-series pattern recognition.
-- **Portfolio Analysis:** Expanding the capability to analyze multiple stocks simultaneously for portfolio risk balancing.
+## 🗺️ Future Roadmap (Architecture Expansion)
+
+This project is currently executing the core ML and RAG functionalities. The upcoming phases will align with our 4-week enterprise architecture plan:
+
+- **Phase 1: Advanced Time-Series Engine (Deep Learning)**
+  - Fully integrating the PyTorch LSTM model (`model_training.py`) to predict downside risks.
+  - Feeding the LSTM outputs as features into the XGBoost tabular model to combine neural network sequencing with tree-based logic.
+- **Phase 2: Institutional Document Intelligence (SEC EDGAR)**
+  - Upgrading the RAG pipeline to fetch and process official SEC 10-K filings (specifically targeting "Item 1A: Risk Factors") using `sec-api`, moving beyond standard Yahoo Finance news.
+- **Phase 3: Backend & API Layer**
+  - Refactoring the `main.py` orchestrator into a fully asynchronous `FastAPI` application to serve risk scores and LLM reports via REST endpoints.
+- **Phase 4: Dockerization & Deployment**
+  - Containerizing the entire stack (XGBoost, Llama 3/Ollama, FAISS, FastAPI) using Docker.
+  - Preparing the system for scalable deployment on AWS or local servers.
