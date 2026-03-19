@@ -1,55 +1,67 @@
-# Finansoer: AI-Powered Financial Risk Analyzer
+#Finansoer: Hybrid AI Risk Analysis Engine 🚀
 
-Finansoer is a comprehensive, fully automated financial analysis pipeline. It is designed to evaluate stock market risks by merging quantitative machine learning metrics with qualitative real-time news analysis driven by Generative AI. 
+Finansoer is an enterprise-grade, fully automated financial risk analysis backend. It merges quantitative Machine Learning (Deep Learning & Tree-based models) with qualitative Document Intelligence (RAG & LLMs) to predict stock market crash risks and provide institutional-level explanations.
 
-Instead of relying solely on numbers or solely on news, Finansoer looks at both. It calculates the statistical probability of a stock crashing and then asks an AI to verify if the real-world news supports that data.
+##🏗️ System Architecture & Completed Milestones
 
-## 🧠 How the Pipeline Works
+We have successfully implemented the entire end-to-end pipeline:
 
-The entire system is orchestrated through a single script (`main.py`) and operates in three major automated steps:
+###1. Data Engineering (collecting_data.py & feature_engineering.py)
 
-### Step 1: Automated Data Collection & Feature Engineering
-- **Data Pulling:** The system dynamically fetches the maximum available historical daily data for a specified stock ticker using the `yfinance` API. It also handles local caching, so it only downloads missing days on subsequent runs.
-- **Math & Indicators:** It automatically calculates critical technical analysis indicators, including the 20-Day and 50-Day Simple Moving Averages (SMA), 14-Day Relative Strength Index (RSI), MACD, and 20-Day Volatility.
-- **Target Labeling:** It looks 5 trading days into the future to create a binary target label: *Will the stock price drop by more than 5%?*
+Asynchronously pulls historical stock data via yfinance.
 
-### Step 2: Machine Learning Risk Scoring (XGBoost & SHAP)
-- **Model Training:** A custom XGBoost classifier is trained on the historical data and calculated indicators.
-- **Probability Calibration:** The model's outputs are calibrated to provide a realistic probability percentage (Risk Score) of a sharp decline occurring in the next 5 days.
-- **Explainability:** Using SHAP (SHapley Additive exPlanations), the system breaks down exactly which indicators increased or decreased the risk score and saves a visual plot (`shap_explanation.png`).
+Dynamically calculates technical indicators (SMA-20, SMA-50, RSI-14, MACD, Volatility).
 
-### Step 3: Generative AI Contextual Analysis (RAG Pipeline)
-- **News Scraping:** The system scrapes the company's business summary and the 5 most recent news headlines.
-- **Vector Database:** It chunks the text and builds a local vector database using FAISS and HuggingFace embeddings (`all-MiniLM-L6-v2`).
-- **LLM Reasoning:** A locally hosted Llama 3 model (via Ollama and LangChain) acts as a Senior Quant Analyst. It reads the numeric risk score from Step 2 and cross-references it with the real-time news to determine if there are hidden fundamental risks or mitigating positive catalysts.
+###2. Hybrid Quantitative Engine (model_training.py & risk_scoring.py)
 
-## 💻 Tech Stack
-- **Core:** Python, Pandas, NumPy
-- **Machine Learning:** XGBoost, Scikit-Learn, SHAP
-- **Generative AI & RAG:** LangChain, FAISS, HuggingFace, Ollama (Llama 3)
-- **Financial Data:** yfinance
+PyTorch LSTM: A Deep Learning sequential model that captures time-series patterns.
 
-## 🚀 Usage
+XGBoost & SHAP: A calibrated tabular model that ingests LSTM predictions and standard indicators to output a probabilistic crash risk score. Explainable AI (SHAP) is used to map feature importances.
 
-1. Open `main.py`.
-2. Change the `POINTED_TICKER` variable to the stock symbol you want to analyze (e.g., `"NVDA"`, `"TSLA"`, `"MSFT"`).
-3. Run the pipeline from your terminal:
+###3. Institutional RAG Pipeline (rag_pipeline.py)
 
-   python main.py
+Connects to the SEC EDGAR database via API to fetch the latest official 10-K filings (Item 1A: Risk Factors).
 
-The system will print out the step-by-step process, the final numerical risk score, the SHAP breakdown, and the Llama 3 analyst report.
+Uses FAISS and HuggingFace embeddings (all-MiniLM-L6-v2) to vectorize corporate documents.
 
-## 🗺️ Future Roadmap (Architecture Expansion)
+Prompts a locally hosted Llama 3 (via Ollama) to synthesize the numerical XGBoost risk score with the actual corporate SEC texts.
 
-This project is currently executing the core ML and RAG functionalities. The upcoming phases will align with our 4-week enterprise architecture plan:
+###4. Microservice & Containerization (main.py & Dockerfile)
 
-- **Phase 1: Advanced Time-Series Engine (Deep Learning)**
-  - Fully integrating the PyTorch LSTM model (`model_training.py`) to predict downside risks.
-  - Feeding the LSTM outputs as features into the XGBoost tabular model to combine neural network sequencing with tree-based logic.
-- **Phase 2: Institutional Document Intelligence (SEC EDGAR)**
-  - Upgrading the RAG pipeline to fetch and process official SEC 10-K filings (specifically targeting "Item 1A: Risk Factors") using `sec-api`, moving beyond standard Yahoo Finance news.
-- **Phase 3: Backend & API Layer**
-  - Refactoring the `main.py` orchestrator into a fully asynchronous `FastAPI` application to serve risk scores and LLM reports via REST endpoints.
-- **Phase 4: Dockerization & Deployment**
-  - Containerizing the entire stack (XGBoost, Llama 3/Ollama, FAISS, FastAPI) using Docker.
-  - Preparing the system for scalable deployment on AWS or local servers.
+Fully wrapped in an asynchronous FastAPI application.
+
+Dockerized for cross-platform, environment-agnostic deployment (handling local host LLM routing via host.docker.internal).
+
+##⚙️ Prerequisites
+Before running the application, ensure you have the following installed on your host machine:
+
+Docker Desktop (Make sure the Docker engine is running).
+
+Ollama (Running locally with the Llama 3 model pulled: ollama run llama3).
+
+An active SEC API Key (from sec-api.io).
+
+##🚀 How to Run (Docker)
+###1. Set up your environment variables
+Create a .env file in the root directory and add your SEC API Key:
+
+###Kod snippet'i
+SEC_API_KEY=your_api_key_here
+2. Build the Docker Image
+Package the application into an isolated container:
+
+###Bash
+docker build -t finansoer .
+3. Run the Container
+Start the FastAPI server. (The application maps port 8000 and connects to your local Ollama instance):
+
+###Bash
+docker run -p 8000:8000 finansoer
+###4. Trigger the AI Engine
+Once the server is running, you can analyze any stock (e.g., TSLA, NVDA, AAPL) by visiting the auto-generated Swagger UI:
+
+Docs: http://localhost:8000/docs
+
+Direct API Call: http://localhost:8000/analyze/TSLA
+
+The API will return a JSON response containing the numerical risk score and a highly professional, context-aware LLM synthesis report.
